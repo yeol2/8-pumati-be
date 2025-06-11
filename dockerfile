@@ -1,5 +1,5 @@
 # 1단계: 빌드 스테이지
-FROM gradle:8.5-jdk17 AS builder
+FROM gradle:8.5-jdk21 AS builder
 
 # 작업 디렉토리 설정
 WORKDIR /app
@@ -20,7 +20,7 @@ RUN chmod +x ./gradlew
 RUN ./gradlew build -x test --stacktrace
 
 # 2단계: 런타임 스테이지
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:21-jre-alpine
 
 # 작업 디렉토리 설정
 WORKDIR /app
