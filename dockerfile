@@ -17,7 +17,7 @@ COPY src ./src
 RUN chmod +x ./gradlew
 
 # 빌드 실행 (테스트 제외)
-RUN ./gradlew build -x test --stacktrace
+RUN ./gradlew build -x test --no-daemon --stacktrace
 
 # 2단계: 런타임 스테이지
 FROM eclipse-temurin:21-jre-alpine

@@ -153,21 +153,32 @@ pipeline {
           sh """
             set -e
 
-            # .env 파일로부터 --build-arg 리스트 생성
-            BUILD_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/--build-arg /' | xargs)
+            echo ".env에서 --build-arg 리스트 생성"
+            BUILD_ARGS=\$(awk -F= '
+              /^[ \\t]*#/ || /^[ \\t]*\$/ { next }  # 주석/빈 줄 제외
+              {
+                key = \$1
+                val = substr(\$0, index(\$0, \$2))
+                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", key)
+                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", val)
+                printf("--build-arg %s=\\"%s\\" ", key, val)
+              }
+            ' .env)
 
-            # Docker 빌드 및 ECR 푸시
+            echo "build args 생성 완료: \$BUILD_ARGS"
+
+            echo "Docker 이미지 빌드 시작"
             docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
 
-            # latest 태그 추가: 버전 태그와 함께 push
+            echo "latest 태그 추가"
             LATEST_TAG="\$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
             docker tag ${env.ECR_IMAGE} \$LATEST_TAG
 
-            # ECR에 push
+            echo "ECR 푸시 시작"
             docker push ${env.ECR_IMAGE}
             docker push \$LATEST_TAG
 
-            # 보안상 .env 제거
+            echo ".env 보안 제거"
             rm -f .env
           """
 
@@ -175,6 +186,7 @@ pipeline {
         }
       }
     }
+
 
     // stage('Save Docker Image & Upload to S3') {
     //   steps {
