@@ -160,42 +160,44 @@ pipeline {
         ============================================
         """
         script {
-          sh """
+          def dockerScript = '''
             set -eux
 
             # .env 파일에서 --build-arg 리스트 생성
-            BUILD_ARGS=\$(awk -F= '
-              /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
+            BUILD_ARGS=$(awk -F= '
+              /^[ \\t]*#/ || /^[ \\t]*$/ { next }
               {
-                key = \$1
-                val = substr(\$0, index(\$0, "=")+1)
+                key = $1
+                val = substr($0, index($0, "=")+1)
                 gsub(/^[ \\t"]+|[ \\t"]+$/, "", key)
                 gsub(/^[ \\t"]+|[ \\t"]+$/, "", val)
                 printf("--build-arg %s=\\"%s\\" ", key, val)
               }
             ' .env)
 
-            echo "생성된 BUILD_ARGS: \$BUILD_ARGS"
+            echo "생성된 BUILD_ARGS: $BUILD_ARGS"
 
             # Docker 이미지 빌드
-            docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
+            docker build $BUILD_ARGS -t ${env.ECR_IMAGE} .
 
             # latest 태그 추가
-            LATEST_TAG="\$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
-            docker tag ${env.ECR_IMAGE} \$LATEST_TAG
+            LATEST_TAG="$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
+            docker tag ${env.ECR_IMAGE} $LATEST_TAG
 
             # ECR에 push
             docker push ${env.ECR_IMAGE}
-            docker push \$LATEST_TAG
+            docker push $LATEST_TAG
 
             # 보안상 .env 제거
             rm -f .env
-          """
+          '''
 
+          sh(script: dockerScript.stripIndent(), shell: 'bash')
           echo "Docker 이미지 빌드 및 ECR push 완료 (${env.IMAGE_TAG} + latest)"
         }
       }
     }
+
 
 
     // stage('Save Docker Image & Upload to S3') {
@@ -228,63 +230,63 @@ pipeline {
     //   }
     // }
 
-//     stage('Deploy to Backend EC2 via SSH') {
-//       steps {
-//         echo """
-//         ============================================
-//         스테이지 시작: Deploy to Backend EC2 via SSH
-//         ============================================
-//         """
-//         script {
-//           echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
+    stage('Deploy to Backend EC2 via SSH') {
+      steps {
+        echo """
+        ============================================
+        스테이지 시작: Deploy to Backend EC2 via SSH
+        ============================================
+        """
+        script {
+          echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
 
-//           def ECR_LATEST_IMAGE = "${env.ECR_IMAGE.split(':')[0]}:latest"
+          def ECR_LATEST_IMAGE = "${env.ECR_IMAGE.split(':')[0]}:latest"
 
-//           withCredentials([
-//             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
-//           ]) {
-//             sh """
-// ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
-//   set -e
+          withCredentials([
+            sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
+          ]) {
+            sh """
+ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
+  set -e
 
-//   echo "기존 컨테이너 중지 및 제거"
-//   CONTAINER_ID=\$(docker ps -aqf "name=^/${env.SERVICE_NAME}\$")
+  echo "기존 컨테이너 중지 및 제거"
+  CONTAINER_ID=\$(docker ps -aqf "name=^/${env.SERVICE_NAME}\$")
 
-//   if [ -n "\$CONTAINER_ID" ]; then
-//     docker stop \$CONTAINER_ID || true
-//     docker rm \$CONTAINER_ID || true
-//   else
-//     echo "삭제할 기존 컨테이너 없음"
-//   fi
+  if [ -n "\$CONTAINER_ID" ]; then
+    docker stop \$CONTAINER_ID || true
+    docker rm \$CONTAINER_ID || true
+  else
+    echo "삭제할 기존 컨테이너 없음"
+  fi
 
-//   echo "ECR 인증"
-//   aws ecr get-login-password --region ${env.AWS_REGION} | \\
-//     docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
+  echo "ECR 인증"
+  aws ecr get-login-password --region ${env.AWS_REGION} | \\
+    docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
 
-//   echo "ECR 이미지 Pull: ${ECR_LATEST_IMAGE}"
-//   docker pull ${ECR_LATEST_IMAGE}
+  echo "ECR 이미지 Pull: ${ECR_LATEST_IMAGE}"
+  docker pull ${ECR_LATEST_IMAGE}
 
-//   echo "새 컨테이너 실행"
-//   # .env 파일로부터 -e 리스트 생성
-//   ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
+  echo "새 컨테이너 실행"
+  # .env 파일로부터 -e 리스트 생성
+  ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
 
-//   docker run -d \\
-//     --name ${env.SERVICE_NAME} \\
-//     --restart unless-stopped \\
-//     -p 8080:8080 \\
-//     \$ENV_ARGS \\
-//     ${ECR_LATEST_IMAGE}
+  docker run -d \\
+    --name ${env.SERVICE_NAME} \\
+    --restart unless-stopped \\
+    -p 8080:8080 \\
+    \$ENV_ARGS \\
+    ${ECR_LATEST_IMAGE}
 
-//   echo "사용하지 않는 이미지 정리"
-//   docker image prune -a -f
+  echo "사용하지 않는 이미지 정리"
+  docker image prune -a -f
 
-//   echo "배포 완료"
-// EOF
-//         """
-//           }
-//         }
-//       }
-//     }
+  echo "배포 완료"
+EOF
+        """
+          }
+        }
+      }
+    }
   }
   
 
