@@ -151,34 +151,34 @@ pipeline {
         """
         script {
           sh """
-            set -e
+            set -eux
 
-            echo ".env에서 --build-arg 리스트 생성"
+            # .env 파일에서 --build-arg 리스트 생성
             BUILD_ARGS=\$(awk -F= '
-              /^[ \\t]*#/ || /^[ \\t]*\$/ { next }  # 주석/빈 줄 제외
+              /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
               {
                 key = \$1
-                val = substr(\$0, index(\$0, \$2))
-                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", key)
-                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", val)
+                val = substr(\$0, index(\$0, "=")+1)
+                gsub(/^[ \\t"]+|[ \\t"]+$/, "", key)
+                gsub(/^[ \\t"]+|[ \\t"]+$/, "", val)
                 printf("--build-arg %s=\\"%s\\" ", key, val)
               }
             ' .env)
 
-            echo "build args 생성 완료: \$BUILD_ARGS"
+            echo "생성된 BUILD_ARGS: \$BUILD_ARGS"
 
-            echo "Docker 이미지 빌드 시작"
-            eval docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
+            # Docker 이미지 빌드
+            docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
 
-            echo "latest 태그 추가"
+            # latest 태그 추가
             LATEST_TAG="\$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
             docker tag ${env.ECR_IMAGE} \$LATEST_TAG
 
-            echo "ECR 푸시 시작"
+            # ECR에 push
             docker push ${env.ECR_IMAGE}
             docker push \$LATEST_TAG
 
-            echo ".env 보안 제거"
+            # 보안상 .env 제거
             rm -f .env
           """
 
@@ -186,6 +186,7 @@ pipeline {
         }
       }
     }
+
 
     // stage('Save Docker Image & Upload to S3') {
     //   steps {
@@ -227,23 +228,17 @@ pipeline {
         script {
           echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
 
-          def ecrLatestImage = "${env.ECR_IMAGE.split(':')[0]}:latest"
-          def privateIp = env.BE_PRIVATE_IP
-          def serviceName = env.SERVICE_NAME
-          def awsRegion = env.AWS_REGION
-          def accountId = env.AWS_ACCOUNT_ID
-
-          echo "ECR_LATEST_IMAGE: ${ecrLatestImage}"
+          def ECR_LATEST_IMAGE = "${env.ECR_IMAGE.split(':')[0]}:latest"
 
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
           ]) {
             sh """
-ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${privateIp} << 'EOF'
+ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
   set -e
 
   echo "기존 컨테이너 중지 및 제거"
-  CONTAINER_ID=\$(docker ps -aqf "name=^/${serviceName}\$")
+  CONTAINER_ID=\$(docker ps -aqf "name=^/${env.SERVICE_NAME}\$")
 
   if [ -n "\$CONTAINER_ID" ]; then
     docker stop \$CONTAINER_ID || true
@@ -253,31 +248,34 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${privateIp} << 'EOF'
   fi
 
   echo "ECR 인증"
-  aws ecr get-login-password --region ${awsRegion} | \\
-    docker login --username AWS --password-stdin ${accountId}.dkr.ecr.${awsRegion}.amazonaws.com
+  aws ecr get-login-password --region ${env.AWS_REGION} | \\
+    docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
 
-  echo "ECR 이미지 Pull: ${ecrLatestImage}"
-  docker pull ${ecrLatestImage}
+  echo "ECR 이미지 Pull: ${ECR_LATEST_IMAGE}"
+  docker pull ${ECR_LATEST_IMAGE}
 
   echo "새 컨테이너 실행"
   ENV_ARGS=\$(awk -F= '
     /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
     {
-      key=\$1
-      val=substr(\$0, index(\$0, \$2))
-      gsub(/^[ \\t"]+|[ \\t"]+\$/, "", key)
-      gsub(/^[ \\t"]+|[ \\t"]+\$/, "", val)
-      printf("-e \\"%s=%s\\" ", key, val)
+      key = \$1
+      val = substr(\$0, index(\$0, "=") + 1)
+      gsub(/^[ \\t"]+|[ \\t"]+$/, "", key)
+      gsub(/^[ \\t"]+|[ \\t"]+$/, "", val)
+      if (length(val) > 0) {
+        printf("-e \\"%s=%s\\" ", key, val)
+      }
     }
   ' .env)
 
   echo "실제 ENV_ARGS: \$ENV_ARGS"
 
   docker run -d \\
-    --name ${serviceName} \\
+    --name ${env.SERVICE_NAME} \\
+    --restart unless-stopped \\
     -p 8080:8080 \\
     \$ENV_ARGS \\
-    ${ecrLatestImage}
+    ${ECR_LATEST_IMAGE}
 
   echo "사용하지 않는 이미지 정리"
   docker image prune -a -f
@@ -290,6 +288,7 @@ EOF
       }
     }
   }
+  
 
   // post {
   //   success {
