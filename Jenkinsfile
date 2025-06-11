@@ -168,7 +168,7 @@ pipeline {
             echo "build args 생성 완료: \$BUILD_ARGS"
 
             echo "Docker 이미지 빌드 시작"
-            docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
+            eval docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
 
             echo "latest 태그 추가"
             LATEST_TAG="\$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
@@ -186,7 +186,6 @@ pipeline {
         }
       }
     }
-
 
     // stage('Save Docker Image & Upload to S3') {
     //   steps {
