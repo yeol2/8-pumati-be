@@ -250,20 +250,19 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   aws ecr get-login-password --region ${env.AWS_REGION} | \\
     docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
 
-  echo "ECR 이미지 Pull: ${ECR_LATEST_IMAGE}"
-  docker pull ${ECR_LATEST_IMAGE}
+  echo "ECR 이미지 Pull: \${ECR_LATEST_IMAGE}"
+  docker pull \${ECR_LATEST_IMAGE}
 
   echo "새 컨테이너 실행"
   # .env 파일로부터 -e 리스트 생성 (공백 포함 안전하게 처리)
-  ENV_ARGS=\$(awk '
-    /^[ \t]*#/ || /^[ \t]*$/ { next }
+  ENV_ARGS=\$(awk -F= '
+    /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
     {
-      split(\$0, arr, "=")
-      key = arr[1]
-      val = substr(\$0, index(\$0, "=")+1)
-      gsub(/^[ \t"]+|[ \t"]+\$/, "", key)
-      gsub(/^[ \t"]+|[ \t"]+\$/, "", val)
-      printf("-e %s=%s ", key, val)
+      key=\$1
+      val=substr(\$0, index(\$0, \$2))
+      gsub(/^[ \\t"]+|[ \\t"]+\$/, "", key)
+      gsub(/^[ \\t"]+|[ \\t"]+\$/, "", val)
+      printf("-e \\"%s=%s\\" ", key, val)
     }
   ' .env)
 
