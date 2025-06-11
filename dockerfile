@@ -4,14 +4,20 @@ FROM gradle:8.5-jdk17 AS builder
 # 작업 디렉토리 설정
 WORKDIR /app
 
-# 캐시 최적화를 위한 Gradle 관련 파일 복사
+# Gradle Wrapper 및 설정 파일 복사
+COPY gradlew gradlew
+COPY gradlew.bat gradlew.bat
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
-COPY gradlew ./
+
+# 소스 복사
 COPY src ./src
 
+# Gradle Wrapper 실행 권한 부여
+RUN chmod +x ./gradlew
+
 # 빌드 실행 (테스트 제외)
-RUN ./gradlew build -x test
+RUN ./gradlew build -x test --stacktrace
 
 # 2단계: 런타임 스테이지
 FROM eclipse-temurin:17-jre-alpine
