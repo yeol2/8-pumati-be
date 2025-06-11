@@ -1,61 +1,51 @@
-#16 32.93 	... 152 more
-#16 32.93 Caused by: org.gradle.jvm.toolchain.internal.install.exceptions.ToolchainProvisioningException: Cannot find a Java installation on your machine (Linux 6.8.0-1029-aws amd64) matching: {languageVersion=21, vendor=any vendor, implementation=vendor-specific}. Toolchain download repositories have not been configured.
-#16 32.93 	at org.gradle.jvm.toolchain.internal.install.DefaultJavaToolchainProvisioningService.tryInstall(DefaultJavaToolchainProvisioningService.java:103)
-#16 32.93 	at org.gradle.jvm.toolchain.internal.JavaToolchainQueryService.downloadToolchain(JavaToolchainQueryService.java:217)
-#16 32.93 	at org.gradle.jvm.toolchain.internal.JavaToolchainQueryService.lambda$query$2(JavaToolchainQueryService.java:187)
-#16 32.93 	at org.gradle.jvm.toolchain.internal.JavaToolchainQueryService.query(JavaToolchainQueryService.java:187)
-#16 32.93 	at org.gradle.jvm.toolchain.internal.JavaToolchainQueryService.lambda$resolveToolchain$1(JavaToolchainQueryService.java:165)
-#16 32.93 	at org.gradle.jvm.toolchain.internal.JavaToolchainQueryService.resolveToolchain(JavaToolchainQueryService.java:163)
-#16 32.93 	at org.gradle.jvm.toolchain.internal.JavaToolchainQueryService.lambda$findMatchingToolchain$0(JavaToolchainQueryService.java:141)
-#16 32.93 	at org.gradle.api.internal.provider.DefaultProvider.calculateOwnValue(DefaultProvider.java:73)
-#16 32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.calculateValue(AbstractMinimalProvider.java:117)
-#16 32.93 	at org.gradle.api.internal.provider.WithSideEffectProvider.calculateOwnValue(WithSideEffectProvider.java:54)
-#16 32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.calculateValue(AbstractMinimalProvider.java:117)
-#16 32.93 	at org.gradle.api.internal.provider.TransformBackedProvider.calculateOwnValue(TransformBackedProvider.java:82)
-#16 32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.calculateValue(AbstractMinimalProvider.java:117)
-#16 32.93 	at org.gradle.api.internal.provider.FlatMapProvider.calculateOwnValue(FlatMapProvider.java:54)
-#16 32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.calculateValue(AbstractMinimalProvider.java:117)
-#16 32.93 	at org.gradle.api.internal.provider.TransformBackedProvider.calculateOwnValue(TransformBackedProvider.java:82)
-#16 32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.calculateValue(AbstractMinimalProvider.java:117)
-#16 32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.withFinalValue(AbstractMinimalProvider.java:182)
-#16 32.93 	at org.gradle.api.internal.provider.DefaultProperty.finalValue(DefaultProperty.java:163)
-#16 32.93 	at org.gradle.api.internal.provider.DefaultProperty.finalValue(DefaultProperty.java:34)
-#16 32.93 	at org.gradle.api.internal.provider.AbstractProperty.finalizeNow(AbstractProperty.java:308)
-#16 32.93 	... 195 more
-#16 32.93 
-#16 32.93 
-#16 32.93 BUILD FAILED in 32s
-#16 ERROR: process "/bin/sh -c ./gradlew build -x test --stacktrace" did not complete successfully: exit code: 1
-------
- > [builder 9/9] RUN ./gradlew build -x test --stacktrace:
-32.93 	at org.gradle.api.internal.provider.TransformBackedProvider.calculateOwnValue(TransformBackedProvider.java:82)
-32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.calculateValue(AbstractMinimalProvider.java:117)
-32.93 	at org.gradle.api.internal.provider.AbstractMinimalProvider.withFinalValue(AbstractMinimalProvider.java:182)
-32.93 	at org.gradle.api.internal.provider.DefaultProperty.finalValue(DefaultProperty.java:163)
-32.93 	at org.gradle.api.internal.provider.DefaultProperty.finalValue(DefaultProperty.java:34)
-32.93 	at org.gradle.api.internal.provider.AbstractProperty.finalizeNow(AbstractProperty.java:308)
-32.93 	... 195 more
-32.93 
-32.93 
-32.93 BUILD FAILED in 32s
-------
-dockerfile:20
---------------------
-  18 |     
-  19 |     # 빌드 실행 (테스트 제외)
-  20 | >>> RUN ./gradlew build -x test --stacktrace
-  21 |     
-  22 |     # 2단계: 런타임 스테이지
---------------------
-ERROR: failed to solve: process "/bin/sh -c ./gradlew build -x test --stacktrace" did not complete successfully: exit code: 1
+ARNING! Your credentials are stored unencrypted in '/home/ubuntu/.docker/config.json'.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/go/credential-store/
+
+ECR 이미지 Pull: 236450698266.dkr.ecr.ap-northeast-2.amazonaws.com/pumati-prod-backend-ecr:latest
+latest: Pulling from pumati-prod-backend-ecr
+f18232174bc9: Pulling fs layer
+f6cd406c8d97: Pulling fs layer
+74f6a226ed93: Pulling fs layer
+e6744199aa66: Pulling fs layer
+cda86626eeb3: Pulling fs layer
+0a183262e376: Pulling fs layer
+e5d9febee432: Pulling fs layer
+e6744199aa66: Waiting
+cda86626eeb3: Waiting
+0a183262e376: Waiting
+e5d9febee432: Waiting
+f6cd406c8d97: Verifying Checksum
+f6cd406c8d97: Download complete
+f18232174bc9: Download complete
+e6744199aa66: Verifying Checksum
+e6744199aa66: Download complete
+cda86626eeb3: Verifying Checksum
+cda86626eeb3: Download complete
+0a183262e376: Verifying Checksum
+0a183262e376: Download complete
+f18232174bc9: Pull complete
+74f6a226ed93: Verifying Checksum
+74f6a226ed93: Download complete
+e5d9febee432: Verifying Checksum
+e5d9febee432: Download complete
+f6cd406c8d97: Pull complete
+74f6a226ed93: Pull complete
+e6744199aa66: Pull complete
+cda86626eeb3: Pull complete
+0a183262e376: Pull complete
+e5d9febee432: Pull complete
+Digest: sha256:a3a022735b95d9252ddcc01bf8a39d9145a6917e06b41d95f34de7a1cf97a147
+Status: Downloaded newer image for 236450698266.dkr.ecr.ap-northeast-2.amazonaws.com/pumati-prod-backend-ecr:latest
+236450698266.dkr.ecr.ap-northeast-2.amazonaws.com/pumati-prod-backend-ecr:latest
+새 컨테이너 실행
+docker: invalid reference format: repository name (library/JWT_ACCESS_TOKEN_EXPIRATION=10) must be lowercase
+
+Run 'docker run --help' for more information
+[Pipeline] }
+[Pipeline] // withCredentials
 [Pipeline] }
 [Pipeline] // script
-[Pipeline] }
-[Pipeline] // stage
-[Pipeline] stage
-[Pipeline] { (Deploy to Backend EC2 via SSH)
-Stage "Deploy to Backend EC2 via SSH" skipped due to earlier failure(s)
-[Pipeline] getContext
 [Pipeline] }
 [Pipeline] // stage
 [Pipeline] }
@@ -65,7 +55,7 @@ Stage "Deploy to Backend EC2 via SSH" skipped due to earlier failure(s)
 [Pipeline] }
 [Pipeline] // node
 [Pipeline] End of Pipeline
-ERROR: script returned exit code 1
+ERROR: script returned exit code 125
 
 GitHub has been notified of this commit’s build result
 
