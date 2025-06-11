@@ -124,15 +124,15 @@ pipeline {
       }
     }
 
-    // .env 파일 내용 확인 
-    stage('Check .env content') {
-      steps {
-        script {
-          echo ".env 파일 내용 확인 시작"
-          sh 'cat .env'
-        }
-      }
-    }
+    // // .env 파일 내용 확인 
+    // stage('Check .env content') {
+    //   steps {
+    //     script {
+    //       echo ".env 파일 내용 확인 시작"
+    //       sh 'cat .env'
+    //     }
+    //   }
+    // }
 
     stage('Authorize Docker to ECR') {
       steps {
@@ -160,7 +160,7 @@ pipeline {
         ============================================
         """
         script {
-          def dockerScript = '''
+          def dockerScript = '''#!/bin/bash
             set -eux
 
             # .env 파일에서 --build-arg 리스트 생성
@@ -192,11 +192,12 @@ pipeline {
             rm -f .env
           '''
 
-          sh(script: dockerScript.stripIndent(), shell: 'bash')
+          sh(script: dockerScript.stripIndent(), shell: '/bin/bash')
           echo "Docker 이미지 빌드 및 ECR push 완료 (${env.IMAGE_TAG} + latest)"
         }
       }
     }
+
 
 
 
