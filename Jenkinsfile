@@ -229,48 +229,53 @@ pipeline {
           echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
 
           def ecrImage = env.ECR_IMAGE.split(':')[0] + ":latest"
+          def privateIp = env.BE_PRIVATE_IP
+          def serviceName = env.SERVICE_NAME
+          def awsRegion = env.AWS_REGION
+          def accountId = env.AWS_ACCOUNT_ID
+
           def sshCommand = """
-            ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
-              set -e
+ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${privateIp} << 'EOF'
+  set -e
 
-              echo "기존 컨테이너 중지 및 제거"
-              CONTAINER_ID=\$(docker ps -aqf "name=^/${env.SERVICE_NAME}\$")
+  echo "기존 컨테이너 중지 및 제거"
+  CONTAINER_ID=\$(docker ps -aqf "name=^/${serviceName}\$")
 
-              if [ -n "\$CONTAINER_ID" ]; then
-                docker stop \$CONTAINER_ID || true
-                docker rm \$CONTAINER_ID || true
-              else
-                echo "삭제할 기존 컨테이너 없음"
-              fi
+  if [ -n "\$CONTAINER_ID" ]; then
+    docker stop \$CONTAINER_ID || true
+    docker rm \$CONTAINER_ID || true
+  else
+    echo "삭제할 기존 컨테이너 없음"
+  fi
 
-              echo "ECR 인증"
-              aws ecr get-login-password --region ${env.AWS_REGION} | \\
-                docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
+  echo "ECR 인증"
+  aws ecr get-login-password --region ${awsRegion} | \\
+    docker login --username AWS --password-stdin ${accountId}.dkr.ecr.${awsRegion}.amazonaws.com
 
-              echo "ECR 이미지 Pull: ${ecrImage}"
-              docker pull ${ecrImage}
+  echo "ECR 이미지 Pull: ${ecrImage}"
+  docker pull ${ecrImage}
 
-              echo "새 컨테이너 실행"
-              ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
+  echo "새 컨테이너 실행"
+  ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
 
-              docker run -d \\
-                --name ${env.SERVICE_NAME} \\
-                --restart unless-stopped \\
-                -p 8080:8080 \\
-                \$ENV_ARGS \\
-                ${ecrImage}
+  docker run -d \\
+    --name ${serviceName} \\
+    --restart unless-stopped \\
+    -p 8080:8080 \\
+    \$ENV_ARGS \\
+    ${ecrImage}
 
-              echo "사용하지 않는 이미지 정리"
-              docker image prune -a -f
+  echo "사용하지 않는 이미지 정리"
+  docker image prune -a -f
 
-              echo "배포 완료"
-            EOF
-          """
+  echo "배포 완료"
+EOF
+"""
 
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
           ]) {
-            sh label: "EC2 배포 스크립트 실행", script: sshCommand
+            sh script: sshCommand
           }
         }
       }
