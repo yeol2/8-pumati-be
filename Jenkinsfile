@@ -4,9 +4,9 @@ pipeline {
   environment {
     PROJECT_NAME     = "pumati"                       // 프로젝트명
     SERVICE_NAME     = "backend"                      // 서비스명
-    S3_BUCKET        = "s3-pumati-common-storage"     // S3 버킷
-    AWS_REGION       = "ap-northeast-2"               // 리전
-    AWS_ACCOUNT_ID   = "236450698266"                 // 계정 ID
+    S3_BUCKET        = "s3-pumati-prod"              // S3 버킷
+    AWS_REGION       = "ap-northeast-2"              // 리전
+    AWS_ACCOUNT_ID   = "236450698266"                // 계정 ID
   }
 
   stages {
@@ -24,6 +24,7 @@ pipeline {
           if (env.BRANCH == 'main') {
             env.ENV_LABEL = 'prod'
             env.BE_PRIVATE_IP = '10.3.0.107'
+            env.SPRING_PROFILES_ACTIVE = 'prod'
           } else {
             echo "지원되지 않는 브랜치입니다: ${env.BRANCH}. 빌드를 중단합니다."
             currentBuild.result = 'NOT_BUILT'
@@ -113,6 +114,18 @@ pipeline {
 
             // 3. 보안 강화를 위한 퍼미션 제한
             sh 'chmod 600 .env'
+
+            // 4. 환경 변수 검증
+            sh '''
+              if ! grep -q "SPRING_PROFILES_ACTIVE=prod" .env; then
+                echo "환경 변수 검증 실패: SPRING_PROFILES_ACTIVE"
+                exit 1
+              fi
+              if ! grep -q "AWS_REGION=ap-northeast-2" .env; then
+                echo "환경 변수 검증 실패: AWS_REGION"
+                exit 1
+              fi
+            '''
 
             echo ".env 파일 로딩 완료"
           } catch (e) {
@@ -268,20 +281,20 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   docker pull ${ECR_LATEST_IMAGE}
 
   echo "새 컨테이너 실행"
-  # .env 파일로부터 -e 리스트 생성
-  ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
-
   docker run -d \\
     --name ${env.SERVICE_NAME} \\
     --restart unless-stopped \\
     -p 8080:8080 \\
-    \$ENV_ARGS \\
+    --env-file .env \\
     ${ECR_LATEST_IMAGE}
 
   echo "사용하지 않는 이미지 정리"
   docker image prune -a -f
 
   echo "배포 완료"
+  
+  # 보안상 .env 파일 삭제
+  rm -f .env
 EOF
         """
           }
@@ -294,13 +307,13 @@ EOF
   // post {
   //   success {
   //     script {
-  //       if (env.BRANCH == 'main') {  // dev 브랜치 조건 제거
+  //       if (env.BRANCH == 'main') {
   //         withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
   //           discordSend(
   //             description: """
   //             제목 : ${currentBuild.displayName}
   //             결과 : 성공
-  //             베포 이미지 태그 : ${env.IMAGE_TAG}
+  //             배포 이미지 태그 : ${env.IMAGE_TAG}
   //             실행 시간 : ${currentBuild.duration / 1000}s
   //             """.stripIndent(),
   //             link: env.BUILD_URL,
@@ -315,7 +328,7 @@ EOF
 
   //   failure {
   //     script {
-  //       if (env.BRANCH == 'main') {  // dev 브랜치 조건 제거
+  //       if (env.BRANCH == 'main') {
   //         withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
   //           discordSend(
   //             description: """
