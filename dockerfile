@@ -5,8 +5,8 @@ FROM gradle:8.5-jdk17 AS builder
 WORKDIR /app
 
 # 캐시 최적화를 위한 Gradle 관련 파일 복사
-COPY build.gradle.kts settings.gradle.kts ./
-COPY gradle ./gradle
+COPY build.gradle settings.gradle ./
+COPY gradle ./gradle  # gradle/wrapper 폴더가 존재하지 않으면 이 줄 삭제
 
 # 애플리케이션 소스 복사
 COPY src ./src

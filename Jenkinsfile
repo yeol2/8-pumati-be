@@ -243,50 +243,13 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   docker pull ${ECR_LATEST_IMAGE}
 
   echo "새 컨테이너 실행"
+  # .env 파일로부터 -e 리스트 생성
+  ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
+
   docker run -d \\
     --name ${env.SERVICE_NAME} \\
     -p 8080:8080 \\
-    -e SPRING_PROFILES_ACTIVE=\$SPRING_PROFILES_ACTIVE \\
-    -e PROD_DB_NAME=\$PROD_DB_NAME \\
-    -e PROD_DB_USERNAME=\$PROD_DB_USERNAME \\
-    -e PROD_DB_PASSWORD=\$PROD_DB_PASSWORD \\
-    -e PROD_DB_HOST=\$PROD_DB_HOST \\
-    -e PROD_DB_PORT=\$PROD_DB_PORT \\
-    -e JWT_ACCESS_TOKEN_EXPIRATION=\$JWT_ACCESS_TOKEN_EXPIRATION \\
-    -e JWT_REFRESH_TOKEN_EXPIRATION=\$JWT_REFRESH_TOKEN_EXPIRATION \\
-    -e JWT_REFRESH_COOKIE_NAME=\$JWT_REFRESH_COOKIE_NAME \\
-    -e JWT_REFRESH_COOKIE_MAX_AGE=\$JWT_REFRESH_COOKIE_MAX_AGE \\
-    -e JWT_SECRET=\$JWT_SECRET \\
-    -e FRONTEND_IS_LOCAL=\$FRONTEND_IS_LOCAL \\
-    -e COOKIE_DEV_DOMAIN=\$COOKIE_DEV_DOMAIN \\
-    -e PROD_FRONTEND_REDIRECT_URI=\$PROD_FRONTEND_REDIRECT_URI \\
-    -e FORTUNE_SERVICE_ERROR_MESSAGE=\$FORTUNE_SERVICE_ERROR_MESSAGE \\
-    -e FORTUNE_SERVICE_URI=\$FORTUNE_SERVICE_URI \\
-    -e AI_COMMENT_SERVICE_URL=\$AI_COMMENT_SERVICE_URL \\
-    -e AI_COMMENT_DEFAULT_TYPE=\$AI_COMMENT_DEFAULT_TYPE \\
-    -e AI_BADGE_SERVICE_URL=\$AI_BADGE_SERVICE_URL \\
-    -e RANKING_SNAPSHOT_DURATION_MINUTES=\$RANKING_SNAPSHOT_DURATION_MINUTES \\
-    -e DEFAULT_PROFILE_IMAGE_PU_URL=\$DEFAULT_PROFILE_IMAGE_PU_URL \\
-    -e DEFAULT_PROFILE_IMAGE_MATI_URL=\$DEFAULT_PROFILE_IMAGE_MATI_URL \\
-    -e DEFAULT_BADGE_IMAGE_URL=\$DEFAULT_BADGE_IMAGE_URL \\
-    -e OAUTH_ALLOWED_PROVIDERS=\$OAUTH_ALLOWED_PROVIDERS \\
-    -e KAKAO_AUTHORIZATION_GRANT_TYPE=\$KAKAO_AUTHORIZATION_GRANT_TYPE \\
-    -e KAKAO_CLIENT_AUTHENTICATION_METHOD=\$KAKAO_CLIENT_AUTHENTICATION_METHOD \\
-    -e KAKAO_CLIENT_ID=\$KAKAO_CLIENT_ID \\
-    -e KAKAO_CLIENT_NAME=\$KAKAO_CLIENT_NAME \\
-    -e KAKAO_CLIENT_SECRET=\$KAKAO_CLIENT_SECRET \\
-    -e KAKAO_REDIRECT_URI=\$KAKAO_REDIRECT_URI \\
-    -e KAKAO_SCOPE=\$KAKAO_SCOPE \\
-    -e KAKAO_AUTHORIZATION_URI=\$KAKAO_AUTHORIZATION_URI \\
-    -e KAKAO_TOKEN_URI=\$KAKAO_TOKEN_URI \\
-    -e KAKAO_USER_INFO_URI=\$KAKAO_USER_INFO_URI \\
-    -e KAKAO_USER_NAME_ATTRIBUTE=\$KAKAO_USER_NAME_ATTRIBUTE \\
-    -e AWS_REGION=\$AWS_REGION \\
-    -e AWS_CREDENTIALS_ACCESS_KEY=\$AWS_CREDENTIALS_ACCESS_KEY \\
-    -e AWS_CREDENTIALS_SECRET_KEY=\$AWS_CREDENTIALS_SECRET_KEY \\
-    -e AWS_S3_BUCKET_NAME=\$AWS_S3_BUCKET_NAME \\
-    -e AWS_S3_EXPIRATION_PUT_MINUTES=\$AWS_S3_EXPIRATION_PUT_MINUTES \\
-    -e AWS_S3_MAX_REQUEST_COUNT=\$AWS_S3_MAX_REQUEST_COUNT \\
+    \$ENV_ARGS \\
     ${ECR_LATEST_IMAGE}
 
   echo "사용하지 않는 이미지 정리"
@@ -301,47 +264,47 @@ EOF
     }
   }
 
-  post {
-    success {
-      script {
-        if (env.BRANCH == 'main') {  // dev 브랜치 조건 제거
-          withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-            discordSend(
-              description: """
-              제목 : ${currentBuild.displayName}
-              결과 : 성공
-              베포 이미지 태그 : ${env.IMAGE_TAG}
-              실행 시간 : ${currentBuild.duration / 1000}s
-              """.stripIndent(),
-              link: env.BUILD_URL,
-              title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 성공",
-              result: 'SUCCESS',
-              webhookURL: DISCORD
-            )
-          }
-        }
-      }
-    }
+  // post {
+  //   success {
+  //     script {
+  //       if (env.BRANCH == 'main') {  // dev 브랜치 조건 제거
+  //         withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+  //           discordSend(
+  //             description: """
+  //             제목 : ${currentBuild.displayName}
+  //             결과 : 성공
+  //             베포 이미지 태그 : ${env.IMAGE_TAG}
+  //             실행 시간 : ${currentBuild.duration / 1000}s
+  //             """.stripIndent(),
+  //             link: env.BUILD_URL,
+  //             title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 성공",
+  //             result: 'SUCCESS',
+  //             webhookURL: DISCORD
+  //           )
+  //         }
+  //       }
+  //     }
+  //   }
 
-    failure {
-      script {
-        if (env.BRANCH == 'main') {  // dev 브랜치 조건 제거
-          withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-            discordSend(
-              description: """
-              제목 : ${currentBuild.displayName}
-              결과 : 실패
-              배포 이미지 태그 : ${env.IMAGE_TAG}
-              실행 시간 : ${currentBuild.duration / 1000}s
-              """.stripIndent(),
-              link: env.BUILD_URL,
-              title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 실패",
-              result: 'FAILURE',
-              webhookURL: DISCORD
-            )
-          }
-        }
-      }
-    }
-  }
+  //   failure {
+  //     script {
+  //       if (env.BRANCH == 'main') {  // dev 브랜치 조건 제거
+  //         withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+  //           discordSend(
+  //             description: """
+  //             제목 : ${currentBuild.displayName}
+  //             결과 : 실패
+  //             배포 이미지 태그 : ${env.IMAGE_TAG}
+  //             실행 시간 : ${currentBuild.duration / 1000}s
+  //             """.stripIndent(),
+  //             link: env.BUILD_URL,
+  //             title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 실패",
+  //             result: 'FAILURE',
+  //             webhookURL: DISCORD
+  //           )
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 }
