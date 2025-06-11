@@ -232,7 +232,7 @@ pipeline {
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
           ]) {
-            sh """
+        sh """
 ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
   set -e
 
@@ -254,8 +254,19 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   docker pull ${ECR_LATEST_IMAGE}
 
   echo "새 컨테이너 실행"
-  # .env 파일로부터 -e 리스트 생성
-  ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
+  # .env 파일로부터 -e 리스트 생성 (공백 포함 안전하게 처리)
+  ENV_ARGS=\$(awk -F= '
+    /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
+    {
+      key=\$1
+      val=substr(\$0, index(\$0, \$2))
+      gsub(/^[ \\t"]+|[ \\t"]+\$/, "", key)
+      gsub(/^[ \\t"]+|[ \\t"]+\$/, "", val)
+      printf("-e \\"%s=%s\\" ", key, val)
+    }
+  ' .env)
+
+  echo "실제 ENV_ARGS: \$ENV_ARGS"
 
   docker run -d \\
     --name ${env.SERVICE_NAME} \\
