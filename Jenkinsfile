@@ -227,7 +227,11 @@ pipeline {
         script {
           echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
 
-          def ECR_LATEST_IMAGE = "${env.ECR_IMAGE.split(':')[0]}:latest"
+          def ecrLatestImage = "${env.ECR_IMAGE.split(':')[0]}:latest"
+          def privateIp = env.BE_PRIVATE_IP
+          def serviceName = env.SERVICE_NAME
+          def awsRegion = env.AWS_REGION
+          def accountId = env.AWS_ACCOUNT_ID
 
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
