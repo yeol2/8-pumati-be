@@ -233,15 +233,17 @@ pipeline {
           def awsRegion = env.AWS_REGION
           def accountId = env.AWS_ACCOUNT_ID
 
+          echo "ECR_LATEST_IMAGE: ${ecrLatestImage}"
+
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
           ]) {
-        sh """
-ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
+            sh """
+ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${privateIp} << 'EOF'
   set -e
 
   echo "기존 컨테이너 중지 및 제거"
-  CONTAINER_ID=\$(docker ps -aqf "name=^/${env.SERVICE_NAME}\$")
+  CONTAINER_ID=\$(docker ps -aqf "name=^/${serviceName}\$")
 
   if [ -n "\$CONTAINER_ID" ]; then
     docker stop \$CONTAINER_ID || true
@@ -251,14 +253,13 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   fi
 
   echo "ECR 인증"
-  aws ecr get-login-password --region ${env.AWS_REGION} | \\
-    docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
+  aws ecr get-login-password --region ${awsRegion} | \\
+    docker login --username AWS --password-stdin ${accountId}.dkr.ecr.${awsRegion}.amazonaws.com
 
-  echo "ECR 이미지 Pull: \${ECR_LATEST_IMAGE}"
-  docker pull \${ECR_LATEST_IMAGE}
+  echo "ECR 이미지 Pull: ${ecrLatestImage}"
+  docker pull ${ecrLatestImage}
 
   echo "새 컨테이너 실행"
-  # .env 파일로부터 -e 리스트 생성 (공백 포함 안전하게 처리)
   ENV_ARGS=\$(awk -F= '
     /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
     {
@@ -273,10 +274,10 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   echo "실제 ENV_ARGS: \$ENV_ARGS"
 
   docker run -d \\
-    --name \${env.SERVICE_NAME} \\
+    --name ${serviceName} \\
     -p 8080:8080 \\
     \$ENV_ARGS \\
-    \${ECR_LATEST_IMAGE}
+    ${ecrLatestImage}
 
   echo "사용하지 않는 이미지 정리"
   docker image prune -a -f
