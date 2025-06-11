@@ -218,27 +218,36 @@ pipeline {
     //   }
     // }
 
-    stage('Deploy to Backend EC2 via SSH') {
-      steps {
-        echo """
-        ============================================
-        스테이지 시작: Deploy to Backend EC2 via SSH
-        ============================================
-        """
-        script {
-          echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
+  stage('Deploy to Backend EC2 via SSH') {
+    steps {
+      echo """
+      ============================================
+      스테이지 시작: Deploy to Backend EC2 via SSH
+      ============================================
+      """
+      script {
+        echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
 
-          def ECR_LATEST_IMAGE = "${env.ECR_IMAGE.split(':')[0]}:latest"
+        // Groovy에서 문자열로 먼저 완성
+        def ecrLatestImage = "${env.ECR_IMAGE.split(':')[0]}:latest"
+        def beIp = env.BE_PRIVATE_IP
+        def service = env.SERVICE_NAME
+        def region = env.AWS_REGION
+        def accountId = env.AWS_ACCOUNT_ID
 
-          withCredentials([
-            sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
-          ]) {
-            sh """
-ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
+        withCredentials([
+          sshUserPrivateKey(
+            credentialsId: 'PUMATI_FULL_MASTER',
+            keyFileVariable: 'KEY_FILE',
+            usernameVariable: 'SSH_USER'
+          )
+        ]) {
+          sh """
+ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${beIp} << EOF
   set -e
 
   echo "기존 컨테이너 중지 및 제거"
-  CONTAINER_ID=\$(docker ps -aqf "name=^/${env.SERVICE_NAME}\$")
+  CONTAINER_ID=\$(docker ps -aqf "name=^/${service}\$")
 
   if [ -n "\$CONTAINER_ID" ]; then
     docker stop \$CONTAINER_ID || true
@@ -248,34 +257,21 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   fi
 
   echo "ECR 인증"
-  aws ecr get-login-password --region ${env.AWS_REGION} | \\
-    docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
+  aws ecr get-login-password --region ${region} | \\
+    docker login --username AWS --password-stdin ${accountId}.dkr.ecr.${region}.amazonaws.com
 
-  echo "ECR 이미지 Pull: ${ECR_LATEST_IMAGE}"
-  docker pull ${ECR_LATEST_IMAGE}
+  echo "ECR 이미지 Pull: ${ecrLatestImage}"
+  docker pull ${ecrLatestImage}
 
   echo "새 컨테이너 실행"
-  ENV_ARGS=\$(awk -F= '
-    /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
-    {
-      key = \$1
-      val = substr(\$0, index(\$0, "=") + 1)
-      gsub(/^[ \\t"]+|[ \\t"]+$/, "", key)
-      gsub(/^[ \\t"]+|[ \\t"]+$/, "", val)
-      if (length(val) > 0) {
-        printf("-e \\"%s=%s\\" ", key, val)
-      }
-    }
-  ' .env)
-
-  echo "실제 ENV_ARGS: \$ENV_ARGS"
+  ENV_ARGS=\$(cat .env | grep -v '^#' | grep -v '^\\s*\$' | sed 's/^/-e /' | xargs)
 
   docker run -d \\
-    --name ${env.SERVICE_NAME} \\
+    --name ${service} \\
     --restart unless-stopped \\
     -p 8080:8080 \\
     \$ENV_ARGS \\
-    ${ECR_LATEST_IMAGE}
+    ${ecrLatestImage}
 
   echo "사용하지 않는 이미지 정리"
   docker image prune -a -f
