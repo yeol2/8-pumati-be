@@ -173,39 +173,39 @@ pipeline {
         ============================================
         """
         script {
-          def dockerScript = '''#!/bin/bash
+          def dockerScript = """
             set -eux
 
             # .env 파일에서 --build-arg 리스트 생성
-            BUILD_ARGS=$(awk -F= '
-              /^[ \\t]*#/ || /^[ \\t]*$/ { next }
+            BUILD_ARGS=\$(awk -F= '
+              /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
               {
-                key = $1
-                val = substr($0, index($0, "=")+1)
-                gsub(/^[ \\t"]+|[ \\t"]+$/, "", key)
-                gsub(/^[ \\t"]+|[ \\t"]+$/, "", val)
+                key = \$1
+                val = substr(\$0, index(\$0, "=")+1)
+                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", key)
+                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", val)
                 printf("--build-arg %s=\\"%s\\" ", key, val)
               }
             ' .env)
 
-            echo "생성된 BUILD_ARGS: $BUILD_ARGS"
+            echo "생성된 BUILD_ARGS: \$BUILD_ARGS"
 
             # Docker 이미지 빌드
-            docker build $BUILD_ARGS -t ${env.ECR_IMAGE} .
+            docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
 
             # latest 태그 추가
-            LATEST_TAG="$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
-            docker tag ${env.ECR_IMAGE} $LATEST_TAG
+            LATEST_TAG="\$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
+            docker tag ${env.ECR_IMAGE} \$LATEST_TAG
 
             # ECR에 push
             docker push ${env.ECR_IMAGE}
-            docker push $LATEST_TAG
+            docker push \$LATEST_TAG
 
             # 보안상 .env 제거
             rm -f .env
-          '''
+          """
 
-          sh(script: dockerScript.stripIndent(), shell: '/bin/bash')
+          sh(script: dockerScript, shell: '/bin/bash')
           echo "Docker 이미지 빌드 및 ECR push 완료 (${env.IMAGE_TAG} + latest)"
         }
       }
