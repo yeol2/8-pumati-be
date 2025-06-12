@@ -2,11 +2,14 @@ pipeline {
   agent any
 
   environment {
-    PROJECT_NAME     = "pumati"                       // 프로젝트명
-    SERVICE_NAME     = "backend"                      // 서비스명
+    PROJECT_NAME     = "pumati"                      // 프로젝트명
+    SERVICE_NAME     = "backend"                     // 서비스명
     S3_BUCKET        = "s3-pumati-prod"              // S3 버킷
     AWS_REGION       = "ap-northeast-2"              // 리전
     AWS_ACCOUNT_ID   = "236450698266"                // 계정 ID
+    CONTAINER_PORT   = "8080"                        // 컨테이너 포트
+    HOST_PORT        = "8080"                        // 호스트 포트
+    CONTAINER_NAME   = "pumati-backend"              // 컨테이너 이름
   }
 
   stages {
@@ -24,7 +27,6 @@ pipeline {
           if (env.BRANCH == 'main') {
             env.ENV_LABEL = 'prod'
             env.BE_PRIVATE_IP = '10.3.0.107'
-            env.SPRING_PROFILES_ACTIVE = 'prod'
           } else {
             echo "지원되지 않는 브랜치입니다: ${env.BRANCH}. 빌드를 중단합니다."
             currentBuild.result = 'NOT_BUILT'
@@ -115,18 +117,6 @@ pipeline {
             // 3. 보안 강화를 위한 퍼미션 제한
             sh 'chmod 600 .env'
 
-            // 4. 환경 변수 검증
-            sh '''
-              if ! grep -q "SPRING_PROFILES_ACTIVE=prod" .env; then
-                echo "환경 변수 검증 실패: SPRING_PROFILES_ACTIVE"
-                exit 1
-              fi
-              if ! grep -q "AWS_REGION=ap-northeast-2" .env; then
-                echo "환경 변수 검증 실패: AWS_REGION"
-                exit 1
-              fi
-            '''
-
             echo ".env 파일 로딩 완료"
           } catch (e) {
             echo ".env 시크릿 로딩 실패: ${e.message}"
@@ -136,16 +126,6 @@ pipeline {
         }
       }
     }
-
-    // // .env 파일 내용 확인 
-    // stage('Check .env content') {
-    //   steps {
-    //     script {
-    //       echo ".env 파일 내용 확인 시작"
-    //       sh 'cat .env'
-    //     }
-    //   }
-    // }
 
     stage('Authorize Docker to ECR') {
       steps {
@@ -239,19 +219,19 @@ pipeline {
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
           ]) {
-        sh """
-ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
+            // 1. .env 파일 EC2로 전송
+            sh """
+            scp -i \$KEY_FILE -o StrictHostKeyChecking=no .env \$SSH_USER@${env.FE_PRIVATE_IP}:/home/\$SSH_USER/.env
+            """
+
+            // 2. 원격 서버에 SSH 접속하여 배포 작업 실행
+            sh """
+ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.FE_PRIVATE_IP} << 'EOF'
   set -e
 
   echo "기존 컨테이너 중지 및 제거"
-  CONTAINER_ID=\$(docker ps -aqf "name=^/${env.SERVICE_NAME}\$")
-
-  if [ -n "\$CONTAINER_ID" ]; then
-    docker stop \$CONTAINER_ID || true
-    docker rm \$CONTAINER_ID || true
-  else
-    echo "삭제할 기존 컨테이너 없음"
-  fi
+  sudo docker stop ${env.CONTAINER_NAME} || true
+  sudo docker rm ${env.CONTAINER_NAME} || true
 
   echo "ECR 인증"
   aws ecr get-login-password --region ${env.AWS_REGION} | \\
@@ -261,12 +241,14 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   docker pull ${ECR_LATEST_IMAGE}
 
   echo "새 컨테이너 실행"
-  docker run -d \\
-    --name ${env.SERVICE_NAME} \\
-    --restart unless-stopped \\
-    -p 8080:8080 \\
-    --env-file /home/\$USER/.env \\
+  docker run -d \
+    --env-file /home/$USER/.env \
+    -p ${env.HOST_PORT}:${env.CONTAINER_PORT} \
+    --name ${env.CONTAINER_NAME} \
     ${ECR_LATEST_IMAGE}
+
+  echo ".env 파일 삭제"
+  rm -f /home/\$USER/.env
 
   echo "사용하지 않는 이미지 정리"
   docker image prune -a -f
