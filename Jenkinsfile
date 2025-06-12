@@ -221,12 +221,12 @@ pipeline {
           ]) {
             // 1. .env 파일 EC2로 전송
             sh """
-            scp -i \$KEY_FILE -o StrictHostKeyChecking=no .env \$SSH_USER@${env.FE_PRIVATE_IP}:/home/\$SSH_USER/.env
+            scp -i \$KEY_FILE -o StrictHostKeyChecking=no .env \$SSH_USER@${env.BE_PRIVATE_IP}:/home/\$SSH_USER/.env
             """
 
             // 2. 원격 서버에 SSH 접속하여 배포 작업 실행
             sh """
-ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.FE_PRIVATE_IP} << 'EOF'
+ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
   set -e
 
   echo "기존 컨테이너 중지 및 제거"
