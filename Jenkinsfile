@@ -4,7 +4,7 @@ pipeline {
   environment {
     PROJECT_NAME     = "pumati"                      // 프로젝트명
     SERVICE_NAME     = "backend"                     // 서비스명
-    S3_BUCKET        = "s3-pumati-prod"              // S3 버킷
+    S3_BUCKET        = "s3-pumati-common-storage"    // S3 버킷
     AWS_REGION       = "ap-northeast-2"              // 리전
     AWS_ACCOUNT_ID   = "236450698266"                // 계정 ID
     CONTAINER_PORT   = "8080"                        // 컨테이너 포트
@@ -204,7 +204,7 @@ pipeline {
             gzip -c ${tarFile} > ${gzipFile}
 
             echo "S3에 업로드 중..."
-            aws s3 cp ${gzipFile} s3://${env.S3_BUCKET}/CI/${env.ENV_LABEL}/${env.SERVICE_NAME}/${gzipFile} --region ${env.AWS_REGION}
+            aws s3 cp ${gzipFile} s3://${env.S3_BUCKET}/CICD/${env.ENV_LABEL}/${env.SERVICE_NAME}/${gzipFile} --region ${env.AWS_REGION}
 
             echo "로컬 파일 정리"
             rm -f ${tarFile} ${gzipFile}
