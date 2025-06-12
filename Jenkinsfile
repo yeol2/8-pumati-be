@@ -10,6 +10,7 @@ pipeline {
     CONTAINER_PORT   = "8080"                        // 컨테이너 포트
     HOST_PORT        = "8080"                        // 호스트 포트
     CONTAINER_NAME   = "pumati-backend"              // 컨테이너 이름
+    ENV_PATH         = "/tmp/.env"                   // .env 파일 경로
   }
 
   stages {
@@ -226,7 +227,6 @@ pipeline {
           echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
 
           def ECR_LATEST_IMAGE = "${env.ECR_IMAGE.split(':')[0]}:latest"
-          def REMOTE_ENV_PATH = "/tmp/.env"
 
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
@@ -234,7 +234,7 @@ pipeline {
             // 1. .env 파일 EC2로 전송 (권한 문제 없는 /tmp 사용)
             sh """
             echo "[단계1] .env 파일 전송 시작"
-            scp -i \$KEY_FILE -o StrictHostKeyChecking=no .env \$SSH_USER@${env.BE_PRIVATE_IP}:${REMOTE_ENV_PATH}
+            scp -i \$KEY_FILE -o StrictHostKeyChecking=no .env \$SSH_USER@${env.BE_PRIVATE_IP}:${env.ENV_PATH}
             echo "[단계1] .env 파일 전송 완료"
             """
 
@@ -257,13 +257,10 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
 
   echo "[단계2-4] 새 컨테이너 실행"
   sudo docker run -d \\
-    --env-file ${REMOTE_ENV_PATH} \\
+    --env-file ${env.ENV_PATH} \\
     -p ${env.HOST_PORT}:${env.CONTAINER_PORT} \\
     --name ${env.CONTAINER_NAME} \\
     ${ECR_LATEST_IMAGE}
-
-  echo "[단계2-5] .env 파일 삭제"
-  rm -f ${REMOTE_ENV_PATH}
 
   echo "[단계2-6] 사용하지 않는 이미지 정리"
   sudo docker image prune -a -f
@@ -276,8 +273,10 @@ EOF
       }
     }
   }
-  
 
+
+  // echo "[단계2-5] .env 파일 삭제"
+  // rm -f ${REMOTE_ENV_PATH}
   post {
     success {
       script {
