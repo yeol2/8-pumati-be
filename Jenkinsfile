@@ -176,22 +176,8 @@ pipeline {
           def dockerScript = """
             set -eux
 
-            # .env 파일에서 --build-arg 리스트 생성
-            BUILD_ARGS=\$(awk -F= '
-              /^[ \\t]*#/ || /^[ \\t]*\$/ { next }
-              {
-                key = \$1
-                val = substr(\$0, index(\$0, "=")+1)
-                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", key)
-                gsub(/^[ \\t"]+|[ \\t"]+\$/, "", val)
-                printf("--build-arg %s=\\"%s\\" ", key, val)
-              }
-            ' .env)
-
-            echo "생성된 BUILD_ARGS: \$BUILD_ARGS"
-
             # Docker 이미지 빌드
-            docker build \$BUILD_ARGS -t ${env.ECR_IMAGE} .
+            docker build -t ${env.ECR_IMAGE} .
 
             # latest 태그 추가
             LATEST_TAG="\$(echo ${env.ECR_IMAGE} | cut -d: -f1):latest"
@@ -200,9 +186,6 @@ pipeline {
             # ECR에 push
             docker push ${env.ECR_IMAGE}
             docker push \$LATEST_TAG
-
-            # 보안상 .env 제거
-            rm -f .env
           """
 
           sh(script: dockerScript, shell: '/bin/bash')
@@ -210,9 +193,6 @@ pipeline {
         }
       }
     }
-
-
-
 
     // stage('Save Docker Image & Upload to S3') {
     //   steps {
@@ -259,7 +239,7 @@ pipeline {
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
           ]) {
-            sh """
+        sh """
 ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
   set -e
 
@@ -285,18 +265,15 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
     --name ${env.SERVICE_NAME} \\
     --restart unless-stopped \\
     -p 8080:8080 \\
-    --env-file .env \\
+    --env-file /home/\$USER/.env \\
     ${ECR_LATEST_IMAGE}
 
   echo "사용하지 않는 이미지 정리"
   docker image prune -a -f
 
   echo "배포 완료"
-  
-  # 보안상 .env 파일 삭제
-  rm -f .env
 EOF
-        """
+            """
           }
         }
       }
