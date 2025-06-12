@@ -269,7 +269,7 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
   sudo docker image prune -a -f
 
   echo "[단계2-7] 배포 헬스 체크"
-  sleep 10
+  sleep 30
   docker ps
   curl -i http://localhost:${env.HOST_PORT}/actuator/health
 
