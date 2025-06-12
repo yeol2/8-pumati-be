@@ -127,6 +127,17 @@ pipeline {
       }
     }
 
+    stage('Build JAR') {
+      steps {
+        sh './gradlew clean build'
+      }
+    }
+    stage('Rename JAR') {
+      steps {
+        sh 'mv build/libs/*.jar build/libs/backend.jar'
+      }
+    }
+
     stage('Authorize Docker to ECR') {
       steps {
         echo """
@@ -215,45 +226,49 @@ pipeline {
           echo "EC2에 SSH 접속하여 백엔드 자동 배포 시작..."
 
           def ECR_LATEST_IMAGE = "${env.ECR_IMAGE.split(':')[0]}:latest"
+          def REMOTE_ENV_PATH = "/tmp/.env"
 
           withCredentials([
             sshUserPrivateKey(credentialsId: 'PUMATI_FULL_MASTER', keyFileVariable: 'KEY_FILE', usernameVariable: 'SSH_USER')
           ]) {
-            // 1. .env 파일 EC2로 전송
+            // 1. .env 파일 EC2로 전송 (권한 문제 없는 /tmp 사용)
             sh """
-            scp -i \$KEY_FILE -o StrictHostKeyChecking=no .env \$SSH_USER@${env.BE_PRIVATE_IP}:/home/\$SSH_USER/.env
+            echo "[단계1] .env 파일 전송 시작"
+            scp -i \$KEY_FILE -o StrictHostKeyChecking=no .env \$SSH_USER@${env.BE_PRIVATE_IP}:${REMOTE_ENV_PATH}
+            echo "[단계1] .env 파일 전송 완료"
             """
 
-            // 2. 원격 서버에 SSH 접속하여 배포 작업 실행
+            // 2. 원격 서버에서 Docker 배포
             sh """
+echo "[단계2] SSH 접속하여 Docker 배포 실행"
 ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} << 'EOF'
   set -e
 
-  echo "기존 컨테이너 중지 및 제거"
+  echo "[단계2-1] 기존 컨테이너 중지 및 제거"
   sudo docker stop ${env.CONTAINER_NAME} || true
   sudo docker rm ${env.CONTAINER_NAME} || true
 
-  echo "ECR 인증"
+  echo "[단계2-2] ECR 인증"
   aws ecr get-login-password --region ${env.AWS_REGION} | \\
-    docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
+    sudo docker login --username AWS --password-stdin ${env.AWS_ACCOUNT_ID}.dkr.ecr.${env.AWS_REGION}.amazonaws.com
 
-  echo "ECR 이미지 Pull: ${ECR_LATEST_IMAGE}"
-  docker pull ${ECR_LATEST_IMAGE}
+  echo "[단계2-3] ECR 이미지 Pull"
+  sudo docker pull ${ECR_LATEST_IMAGE}
 
-  echo "새 컨테이너 실행"
-  docker run -d \
-    --env-file /home/$USER/.env \
-    -p ${env.HOST_PORT}:${env.CONTAINER_PORT} \
-    --name ${env.CONTAINER_NAME} \
+  echo "[단계2-4] 새 컨테이너 실행"
+  sudo docker run -d \\
+    --env-file ${REMOTE_ENV_PATH} \\
+    -p ${env.HOST_PORT}:${env.CONTAINER_PORT} \\
+    --name ${env.CONTAINER_NAME} \\
     ${ECR_LATEST_IMAGE}
 
-  echo ".env 파일 삭제"
-  rm -f /home/\$USER/.env
+  echo "[단계2-5] .env 파일 삭제"
+  rm -f ${REMOTE_ENV_PATH}
 
-  echo "사용하지 않는 이미지 정리"
-  docker image prune -a -f
+  echo "[단계2-6] 사용하지 않는 이미지 정리"
+  sudo docker image prune -a -f
 
-  echo "배포 완료"
+  echo "[단계2-7] 배포 완료"
 EOF
             """
           }
