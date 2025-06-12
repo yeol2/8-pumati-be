@@ -133,6 +133,7 @@ pipeline {
         sh './gradlew clean build -x test'
       }
     }
+    
     stage('Rename JAR') {
       steps {
         sh 'mv build/libs/*.jar build/libs/backend.jar'
@@ -282,9 +283,6 @@ EOF
     }
   }
 
-
-  // echo "[단계2-5] .env 파일 삭제"
-  // rm -f ${REMOTE_ENV_PATH}
   post {
     success {
       script {
