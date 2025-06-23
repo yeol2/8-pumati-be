@@ -263,9 +263,6 @@ ssh -o StrictHostKeyChecking=no -i \$KEY_FILE \$SSH_USER@${env.BE_PRIVATE_IP} <<
     --name ${env.CONTAINER_NAME} \\
     ${ECR_LATEST_IMAGE}
 
-  echo "[단계2-5] .env 파일 삭제"
-  rm -f ${env.ENV_PATH}
-
   echo "[단계2-6] 사용하지 않는 이미지 정리"
   sudo docker image prune -a -f
 
@@ -282,6 +279,8 @@ EOF
       }
     }
   }
+  //   echo "[단계2-5] .env 파일 삭제"
+  // rm -f ${env.ENV_PATH}
 
   // post {
   //   success {
