@@ -27,7 +27,7 @@ pipeline {
 
           if (env.BRANCH == 'main') {
             env.ENV_LABEL = 'prod'
-            env.BE_PRIVATE_IP = '10.3.0.107'
+            env.BE_PRIVATE_IP = '10.1.2.71'
           } else {
             echo "지원되지 않는 브랜치입니다: ${env.BRANCH}. 빌드를 중단합니다."
             currentBuild.result = 'NOT_BUILT'
@@ -103,7 +103,7 @@ pipeline {
             def secret = sh(
               script: """
                 set -e
-                aws secretsmanager get-secret-value \
+                /usr/local/bin/aws secretsmanager get-secret-value \
                   --secret-id ${env.PROJECT_NAME}-${env.ENV_LABEL}-${env.SERVICE_NAME}-.env \
                   --region ${env.AWS_REGION} \
                   --query SecretString \
@@ -187,35 +187,35 @@ pipeline {
       }
     }
 
-    stage('Save Docker Image & Upload to S3') {
-      steps {
-        echo """
-        ============================================
-        스테이지 시작: Save Docker Image & Upload to S3
-        ============================================
-        """
-        script {
-          def tarFile = "${env.IMAGE_TAG}.tar"
-          def gzipFile = "${tarFile}.gz"
+    // stage('Save Docker Image & Upload to S3') {
+    //   steps {
+    //     echo """
+    //     ============================================
+    //     스테이지 시작: Save Docker Image & Upload to S3
+    //     ============================================
+    //     """
+    //     script {
+    //       def tarFile = "${env.IMAGE_TAG}.tar"
+    //       def gzipFile = "${tarFile}.gz"
 
-          sh """
-            echo "Docker 이미지 저장: ${tarFile}"
-            docker save -o ${tarFile} ${env.ECR_IMAGE}
+    //       sh """
+    //         echo "Docker 이미지 저장: ${tarFile}"
+    //         docker save -o ${tarFile} ${env.ECR_IMAGE}
 
-            echo "압축 중: ${gzipFile}"
-            gzip -c ${tarFile} > ${gzipFile}
+    //         echo "압축 중: ${gzipFile}"
+    //         gzip -c ${tarFile} > ${gzipFile}
 
-            echo "S3에 업로드 중..."
-            aws s3 cp ${gzipFile} s3://${env.S3_BUCKET}/CICD/${env.ENV_LABEL}/${env.SERVICE_NAME}/${gzipFile} --region ${env.AWS_REGION}
+    //         echo "S3에 업로드 중..."
+    //         aws s3 cp ${gzipFile} s3://${env.S3_BUCKET}/CICD/${env.ENV_LABEL}/${env.SERVICE_NAME}/${gzipFile} --region ${env.AWS_REGION}
 
-            echo "로컬 파일 정리"
-            rm -f ${tarFile} ${gzipFile}
+    //         echo "로컬 파일 정리"
+    //         rm -f ${tarFile} ${gzipFile}
 
-            echo "S3 업로드 완료"
-          """
-        }
-      }
-    }
+    //         echo "S3 업로드 완료"
+    //       """
+    //     }
+    //   }
+    // }
 
     stage('Deploy to Backend EC2 via SSH') {
       steps {
@@ -283,47 +283,47 @@ EOF
     }
   }
 
-  post {
-    success {
-      script {
-        if (env.BRANCH == 'main') {
-          withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-            discordSend(
-              description: """
-              제목 : ${currentBuild.displayName}
-              결과 : 성공
-              배포 이미지 태그 : ${env.IMAGE_TAG}
-              실행 시간 : ${currentBuild.duration / 1000}s
-              """.stripIndent(),
-              link: env.BUILD_URL,
-              title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 성공",
-              result: 'SUCCESS',
-              webhookURL: DISCORD
-            )
-          }
-        }
-      }
-    }
+  // post {
+  //   success {
+  //     script {
+  //       if (env.BRANCH == 'main') {
+  //         withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+  //           discordSend(
+  //             description: """
+  //             제목 : ${currentBuild.displayName}
+  //             결과 : 성공
+  //             배포 이미지 태그 : ${env.IMAGE_TAG}
+  //             실행 시간 : ${currentBuild.duration / 1000}s
+  //             """.stripIndent(),
+  //             link: env.BUILD_URL,
+  //             title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 성공",
+  //             result: 'SUCCESS',
+  //             webhookURL: DISCORD
+  //           )
+  //         }
+  //       }
+  //     }
+  //   }
 
-    failure {
-      script {
-        if (env.BRANCH == 'main') {
-          withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
-            discordSend(
-              description: """
-              제목 : ${currentBuild.displayName}
-              결과 : 실패
-              배포 이미지 태그 : ${env.IMAGE_TAG}
-              실행 시간 : ${currentBuild.duration / 1000}s
-              """.stripIndent(),
-              link: env.BUILD_URL,
-              title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 실패",
-              result: 'FAILURE',
-              webhookURL: DISCORD
-            )
-          }
-        }
-      }
-    }
-  }
+  //   failure {
+  //     script {
+  //       if (env.BRANCH == 'main') {
+  //         withCredentials([string(credentialsId: 'Discord-Webhook', variable: 'DISCORD')]) {
+  //           discordSend(
+  //             description: """
+  //             제목 : ${currentBuild.displayName}
+  //             결과 : 실패
+  //             배포 이미지 태그 : ${env.IMAGE_TAG}
+  //             실행 시간 : ${currentBuild.duration / 1000}s
+  //             """.stripIndent(),
+  //             link: env.BUILD_URL,
+  //             title: "${env.JOB_NAME} :: ${env.BRANCH} :: 배포 실패",
+  //             result: 'FAILURE',
+  //             webhookURL: DISCORD
+  //           )
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
 }
